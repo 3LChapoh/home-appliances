@@ -11,6 +11,14 @@ const CAT_IMAGES={
  niche:[["QkC2gICf0zc","MPs_GAPXU8E"],["Y8kwv9_Vay8","ZwnxpvwJO2U"]]
 };
 const DEFAULT_IMG=uimg("QkC2gICf0zc"),DEFAULT_ALT=uimg("_ju6ZXbNKvY");
+
+const API_BASE="http://localhost:5000";
+function apiProductToLegacy(p){
+ const catKey=(p.category||"").toLowerCase().trim();
+ const img0=(p.images&&p.images[0])?API_BASE+p.images[0]:DEFAULT_IMG;
+ const img1=(p.images&&p.images[1])?API_BASE+p.images[1]:img0;
+ return{id:p._id,name:p.name,cat:catKey,vendor:p.vendor,price:p.price,desc:p.description||"",image:img0,alt:img1,imgSlug:slugify(p.name),qty:typeof p.stock==="number"?p.stock:0};
+}
 function catImagePair(catKey,seq){const pool=CAT_IMAGES[catKey]||CAT_IMAGES.edp;const pair=pool[seq%pool.length];return{image:uimg(pair[0]),alt:uimg(pair[1],700,850)}}
 const categories=[
  {id:"edp",name:"Eau de Parfum",color:"#4d91c9",desc:"Signature compositions"},
@@ -600,4 +608,21 @@ addEventListener("popstate",routeFromHash);
  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}}),{threshold:.12});document.querySelectorAll(".reveal").forEach(x=>io.observe(x));
  routeFromHash();
 }
-init();
+async function bootstrap(){
+ try{
+  const res=await fetch(API_BASE+"/api/products");
+  if(res.ok){
+   const data=await res.json();
+   if(Array.isArray(data)&&data.length){
+    const mapped=data.map(apiProductToLegacy);
+    products.length=0;
+    products.push(...mapped);
+    state.products=products;
+   }
+  }
+ }catch(e){
+  console.warn("Could not load products from API, using defaults:",e);
+ }
+ init();
+}
+bootstrap();
