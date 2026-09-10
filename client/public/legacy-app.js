@@ -12,7 +12,7 @@ const CAT_IMAGES={
 };
 const DEFAULT_IMG=uimg("QkC2gICf0zc"),DEFAULT_ALT=uimg("_ju6ZXbNKvY");
 
-const API_BASE="http://localhost:5000";
+const API_BASE="https://rubys-choice-api.onrender.com";
 function apiProductToLegacy(p){
  const catKey=(p.category||"").toLowerCase().trim();
  const img0=(p.images&&p.images[0])?API_BASE+p.images[0]:DEFAULT_IMG;
