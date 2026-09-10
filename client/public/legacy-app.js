@@ -19,6 +19,43 @@ function apiProductToLegacy(p){
  const img1=(p.images&&p.images[1])?API_BASE+p.images[1]:img0;
  return{id:p._id,name:p.name,cat:catKey,vendor:p.vendor,price:p.price,desc:p.description||"",image:img0,alt:img1,imgSlug:slugify(p.name),qty:typeof p.stock==="number"?p.stock:0};
 }
+async function refreshProductsFromAPI(){
+ try{
+  const res=await fetch(API_BASE+"/api/products");
+  if(res.ok){
+   const data=await res.json();
+   const mapped=Array.isArray(data)?data.map(apiProductToLegacy):[];
+   products.length=0;
+   products.push(...mapped);
+   state.products=products;
+   save();
+   renderProducts();
+  }
+ }catch(e){
+  console.warn("Could not refresh products from API:",e);
+ }
+}
+async function createProductAPI(fields,file){
+ const fd=new FormData();
+ Object.entries(fields).forEach(([k,v])=>fd.append(k,v));
+ if(file)fd.append("images",file);
+ const res=await fetch(API_BASE+"/api/products",{method:"POST",body:fd});
+ if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.message||"Could not add product")}
+ return res.json();
+}
+async function updateProductAPI(id,fields,file){
+ const fd=new FormData();
+ Object.entries(fields).forEach(([k,v])=>fd.append(k,v));
+ if(file)fd.append("images",file);
+ const res=await fetch(API_BASE+"/api/products/"+id,{method:"PUT",body:fd});
+ if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.message||"Could not update product")}
+ return res.json();
+}
+async function deleteProductAPI(id){
+ const res=await fetch(API_BASE+"/api/products/"+id,{method:"DELETE"});
+ if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.message||"Could not delete product")}
+ return res.json();
+}
 function catImagePair(catKey,seq){const pool=CAT_IMAGES[catKey]||CAT_IMAGES.edp;const pair=pool[seq%pool.length];return{image:uimg(pair[0]),alt:uimg(pair[1],700,850)}}
 const categories=[
  {id:"edp",name:"Eau de Parfum",color:"#4d91c9",desc:"Signature compositions"},
@@ -240,13 +277,16 @@ function addCart(id){
 function renderCartCount(){let n=state.cart.reduce((n,i)=>n+i.qty,0);$("#cartCount").textContent=n;$("#cartCountBottom").textContent=n}
 let lastFocused=null;
 let pendingProductImage=null;
+let pendingProductFile=null;
 function wireProductImageInput(){
  pendingProductImage=null;
+ pendingProductFile=null;
  $("#pfImage").onchange=e=>{
   const file=e.target.files[0];
   if(!file)return;
   if(!file.type.startsWith("image/")){toast("Please choose an image file",true);return}
   if(file.size>15*1024*1024){toast("That image is too large (max 15MB)",true);return}
+  pendingProductFile=file;
   const reader=new FileReader();
   reader.onload=()=>{
    const img=new Image();
@@ -476,19 +516,24 @@ function renderAdmin(){
  $("#apps").querySelectorAll("[data-reject]").forEach(b=>b.onclick=()=>{let a=state.applications.find(x=>x.id===b.dataset.reject);a.status="Rejected";save();adminDash();toast("Application rejected")});
  $("#apps").querySelectorAll("[data-pin]").forEach(b=>b.onclick=()=>{let a=state.applications.find(x=>x.id===b.dataset.pin);if(a.status!=="Approved")return toast("Approve vendor first");a.pin=a.pin||String(Math.floor(100000+Math.random()*900000));save();alert(`One-time activation PIN for ${a.boutique}: ${a.pin}`)});
  $("#adminProducts").querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>editProduct(b.dataset.edit));
- $("#adminProducts").querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>{let p=products.find(x=>x.id===b.dataset.delete);if(p&&confirm(`Delete ${p.name}?`)){products.splice(products.indexOf(p),1);state.cart=state.cart.filter(i=>i.id!==p.id);state.favourites=state.favourites.filter(id=>id!==p.id);save();renderProducts();renderCartCount();renderFavCount();adminDash();toast("Product deleted")}})
+ $("#adminProducts").querySelectorAll("[data-delete]").forEach(b=>b.onclick=async()=>{let p=products.find(x=>x.id===b.dataset.delete);if(!p||!confirm(`Delete ${p.name}?`))return;try{await deleteProductAPI(p.id);state.cart=state.cart.filter(i=>i.id!==p.id);state.favourites=state.favourites.filter(id=>id!==p.id);await refreshProductsFromAPI();renderCartCount();renderFavCount();adminDash();toast("Product deleted")}catch(err){toast(err.message||"Could not delete product",true)}})
 }
 function addProductView(){
  const vendorNames=allVendorNames();
  openDrawer(`<div class="drawer-head"><h2>Add product</h2><button class="close" data-close>×</button></div><form class="form" id="addProductForm"><label>Product name<input class="field" id="pfName" required placeholder="e.g. Velvet Nairobi"></label><label>Boutique / vendor<input class="field" id="pfVendor" list="vendorOptions" required placeholder="Boutique name"></label><datalist id="vendorOptions">${vendorNames.map(v=>`<option value="${escapeHtml(v)}">`).join("")}</datalist><label>Category<select class="field" id="pfCategory">${categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join("")}</select></label><label>Price (KES)<input class="field" id="pfPrice" type="number" min="0" required></label><label>Stock quantity<input class="field" id="pfQty" type="number" min="0" required></label><label>Description<textarea class="field" id="pfDesc" placeholder="Notes, top and base accords…"></textarea></label><label>Product photo<input class="field" id="pfImage" type="file" accept="image/*"></label><div><img id="pfPreview" style="width:90px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:none"></div><button class="goldbtn">Add product</button></form>`);
  wireProductImageInput();
- $("#addProductForm").onsubmit=e=>{
+ $("#addProductForm").onsubmit=async e=>{
   e.preventDefault();
   const name=$("#pfName").value.trim(),vendor=$("#pfVendor").value.trim();
   if(!name||!vendor){toast("Enter a product name and boutique",true);return}
-  const slug=slugify(name),image=pendingProductImage||DEFAULT_IMG;
-  products.push({id:newProductId(),name,cat:$("#pfCategory").value,vendor,price:Math.max(0,+$("#pfPrice").value||0),desc:$("#pfDesc").value.trim(),image,alt:pendingProductImage||DEFAULT_ALT,imgSlug:slug,qty:Math.max(0,+$("#pfQty").value||0)});
-  save();renderProducts();adminDash();toast("Product added to the catalogue");
+  try{
+   await createProductAPI({name,vendor,category:$("#pfCategory").value,price:Math.max(0,+$("#pfPrice").value||0),description:$("#pfDesc").value.trim(),stock:Math.max(0,+$("#pfQty").value||0)},pendingProductFile);
+   await refreshProductsFromAPI();
+   adminDash();
+   toast("Product added to the catalogue");
+  }catch(err){
+   toast(err.message||"Could not add product",true);
+  }
  };
 }
 function editProduct(id,opts={}){
@@ -496,13 +541,18 @@ function editProduct(id,opts={}){
  let p=products.find(x=>x.id===id);
  openDrawer(`<div class="drawer-head"><h2>Edit product</h2><button class="close" data-close>×</button></div><form class="form" id="editForm"><label>Name<input class="field" id="pn" value="${escapeHtml(p.name)}" required></label><label>Boutique / vendor<input class="field" id="pv" list="vendorOptions" value="${escapeHtml(p.vendor)}" ${lockVendor?"disabled":""} required></label><datalist id="vendorOptions">${allVendorNames().map(v=>`<option value="${escapeHtml(v)}">`).join("")}</datalist><label>Category<select class="field" id="pc">${categories.map(c=>`<option value="${c.id}" ${p.cat===c.id?"selected":""}>${c.name}</option>`).join("")}</select></label><label>Price<input class="field" id="pp" type="number" min="0" value="${p.price}" required></label><label>Stock quantity<input class="field" id="pq" type="number" min="0" value="${p.qty}" required></label><label>Description<textarea class="field" id="pd">${escapeHtml(p.desc)}</textarea></label><label>Product photo<input class="field" id="pfImage" type="file" accept="image/*"></label><div><img id="pfPreview" src="${p.image}" onerror="this.style.display='none'" style="width:90px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--line)"></div><button class="goldbtn">Save changes</button></form>`);
  wireProductImageInput();
- $("#editForm").onsubmit=e=>{
+ $("#editForm").onsubmit=async e=>{
   e.preventDefault();
   const name=$("#pn").value.trim(),vendor=lockVendor?p.vendor:$("#pv").value.trim();
   if(!name||!vendor){toast("Enter a product name and boutique",true);return}
-  p.name=name;p.vendor=vendor;p.cat=$("#pc").value;p.price=Math.max(0,+$("#pp").value||0);p.qty=Math.max(0,+$("#pq").value||0);p.desc=$("#pd").value.trim();
-  if(pendingProductImage){p.image=pendingProductImage;p.alt=pendingProductImage}
-  save();renderProducts();onDone();toast("Product updated");
+  try{
+   await updateProductAPI(p.id,{name,vendor,category:$("#pc").value,price:Math.max(0,+$("#pp").value||0),description:$("#pd").value.trim(),stock:Math.max(0,+$("#pq").value||0)},pendingProductFile);
+   await refreshProductsFromAPI();
+   onDone();
+   toast("Product updated");
+  }catch(err){
+   toast(err.message||"Could not update product",true);
+  }
  };
 }
 function vendorDash(){
@@ -526,14 +576,20 @@ function vendorDash(){
   if(!p||p.vendor!==vendorName)return toast("You can only edit your own boutique's products",true);
   editProduct(p.id,{onDone:vendorDash,lockVendor:true});
  });
- $("#vendorProducts").querySelectorAll("[data-vdelete]").forEach(b=>b.onclick=()=>{
+ $("#vendorProducts").querySelectorAll("[data-vdelete]").forEach(b=>b.onclick=async()=>{
   const p=products.find(x=>x.id===b.dataset.vdelete);
   if(!p||p.vendor!==vendorName)return toast("You can only delete your own boutique's products",true);
   if(!confirm(`Delete ${p.name}?`))return;
-  products.splice(products.indexOf(p),1);
-  state.cart=state.cart.filter(i=>i.id!==p.id);
-  state.favourites=state.favourites.filter(id=>id!==p.id);
-  save();renderProducts();renderCartCount();renderFavCount();vendorDash();toast("Product deleted");
+  try{
+   await deleteProductAPI(p.id);
+   state.cart=state.cart.filter(i=>i.id!==p.id);
+   state.favourites=state.favourites.filter(id=>id!==p.id);
+   await refreshProductsFromAPI();
+   renderCartCount();renderFavCount();vendorDash();
+   toast("Product deleted");
+  }catch(err){
+   toast(err.message||"Could not delete product",true);
+  }
  });
 }
 function vendorAddProductView(){
@@ -541,13 +597,18 @@ function vendorAddProductView(){
  const vendorName=state.vendorSession;
  openDrawer(`<div class="drawer-head"><h2>Add product</h2><button class="close" data-close>×</button></div><form class="form" id="vendorAddForm"><div class="notice">Listing under <b>${escapeHtml(vendorName)}</b></div><label>Product name<input class="field" id="pfName" required placeholder="e.g. Velvet Nairobi"></label><label>Category<select class="field" id="pfCategory">${categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join("")}</select></label><label>Price (KES)<input class="field" id="pfPrice" type="number" min="0" required></label><label>Stock quantity<input class="field" id="pfQty" type="number" min="0" required></label><label>Description<textarea class="field" id="pfDesc" placeholder="Notes, top and base accords…"></textarea></label><label>Product photo<input class="field" id="pfImage" type="file" accept="image/*"></label><div><img id="pfPreview" style="width:90px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:none"></div><button class="goldbtn">Add product</button></form>`);
  wireProductImageInput();
- $("#vendorAddForm").onsubmit=e=>{
+ $("#vendorAddForm").onsubmit=async e=>{
   e.preventDefault();
   const name=$("#pfName").value.trim();
   if(!name){toast("Enter a product name",true);return}
-  const slug=slugify(name),image=pendingProductImage||DEFAULT_IMG;
-  products.push({id:newProductId(),name,cat:$("#pfCategory").value,vendor:vendorName,price:Math.max(0,+$("#pfPrice").value||0),desc:$("#pfDesc").value.trim(),image,alt:pendingProductImage||DEFAULT_ALT,imgSlug:slug,qty:Math.max(0,+$("#pfQty").value||0)});
-  save();renderProducts();vendorDash();toast("Product added to your boutique");
+  try{
+   await createProductAPI({name,vendor:vendorName,category:$("#pfCategory").value,price:Math.max(0,+$("#pfPrice").value||0),description:$("#pfDesc").value.trim(),stock:Math.max(0,+$("#pfQty").value||0)},pendingProductFile);
+   await refreshProductsFromAPI();
+   vendorDash();
+   toast("Product added to your boutique");
+  }catch(err){
+   toast(err.message||"Could not add product",true);
+  }
  };
 }
 function heroSetup(){
