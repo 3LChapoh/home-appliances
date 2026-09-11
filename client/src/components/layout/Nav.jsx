@@ -3,14 +3,19 @@ import { useAuth } from '../../context/AuthContext'
 import { useCart } from '../../context/CartContext'
 import AccountDrawer from '../account/AccountDrawer'
 import CartDrawer from '../cart/CartDrawer'
+import OrdersDrawer from '../orders/OrdersDrawer'
 
 function Nav() {
-  const [openDrawer, setOpenDrawer] = useState(null) // null | 'account' | 'cart'
+  const [openDrawer, setOpenDrawer] = useState(null) // null | 'account' | 'cart' | 'orders'
   const { user } = useAuth()
   const { count } = useCart()
 
   function close() {
     setOpenDrawer(null)
+  }
+
+  function openOrders() {
+    setOpenDrawer(user ? 'orders' : 'account')
   }
 
   return (
@@ -24,7 +29,13 @@ function Nav() {
             <a href="#collection">Collection</a>
             <a href="#categories">Categories</a>
             <a href="#partner">Partner</a>
-            <a href="#orders">Orders</a>
+            <button
+              className="navlink-btn"
+              onClick={openOrders}
+              style={{ background: 'none', border: 'none', color: 'inherit', font: 'inherit', cursor: 'pointer', padding: 0 }}
+            >
+              Orders
+            </button>
           </nav>
           <div className="nav-actions">
             <button className="iconbtn" aria-label="Toggle light or dark theme">☼</button>
@@ -52,6 +63,7 @@ function Nav() {
           {openDrawer === 'cart' && (
             <CartDrawer onClose={close} onOpenAccount={() => setOpenDrawer('account')} />
           )}
+          {openDrawer === 'orders' && <OrdersDrawer onClose={close} />}
         </div>
       </div>
     </>
