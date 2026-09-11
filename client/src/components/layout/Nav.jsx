@@ -1,10 +1,17 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { useCart } from '../../context/CartContext'
 import AccountDrawer from '../account/AccountDrawer'
+import CartDrawer from '../cart/CartDrawer'
 
 function Nav() {
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [openDrawer, setOpenDrawer] = useState(null) // null | 'account' | 'cart'
   const { user } = useAuth()
+  const { count } = useCart()
+
+  function close() {
+    setOpenDrawer(null)
+  }
 
   return (
     <>
@@ -24,20 +31,27 @@ function Nav() {
             <button
               className="iconbtn"
               aria-label="Account and sign in"
-              onClick={() => setDrawerOpen(true)}
+              onClick={() => setOpenDrawer('account')}
             >
               {user ? '●' : '♙'}
             </button>
-            <button className="iconbtn" aria-label="Open shopping bag">
-              🛍 <span className="cart-count">0</span>
+            <button
+              className="iconbtn"
+              aria-label="Open shopping bag"
+              onClick={() => setOpenDrawer('cart')}
+            >
+              🛍 <span className="cart-count">{count}</span>
             </button>
           </div>
         </div>
       </header>
 
-      <div className={`overlay${drawerOpen ? ' open' : ''}`} onClick={() => setDrawerOpen(false)}>
+      <div className={`overlay${openDrawer ? ' open' : ''}`} onClick={close}>
         <div onClick={(e) => e.stopPropagation()}>
-          {drawerOpen && <AccountDrawer onClose={() => setDrawerOpen(false)} />}
+          {openDrawer === 'account' && <AccountDrawer onClose={close} />}
+          {openDrawer === 'cart' && (
+            <CartDrawer onClose={close} onOpenAccount={() => setOpenDrawer('account')} />
+          )}
         </div>
       </div>
     </>

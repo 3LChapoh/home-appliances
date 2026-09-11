@@ -5,6 +5,7 @@ const path = require('path')
 const connectDB = require('./config/db')
 const productRoutes = require('./routes/productRoutes')
 const authRoutes = require('./routes/authRoutes')
+const orderRoutes = require('./routes/orderRoutes')
 
 const app = express()
 
@@ -36,6 +37,7 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')))
 
 app.use('/api/products', productRoutes)
 app.use('/api/auth', authRoutes)
+app.use('/api/orders', orderRoutes)
 
 app.get('/', (req, res) => {
   res.json({ message: "Ruby's Choice API is running" })

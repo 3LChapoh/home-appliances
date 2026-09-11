@@ -1,3 +1,5 @@
+import { useCart } from '../../context/CartContext'
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 function imageUrl(path) {
@@ -6,6 +8,7 @@ function imageUrl(path) {
 }
 
 function ProductCard({ product }) {
+  const { addItem } = useCart()
   const mainImage = product.images?.[0]
   const altImage = product.images?.[1]
 
@@ -23,7 +26,11 @@ function ProductCard({ product }) {
         <h3>{product.name}</h3>
         <p>{product.description}</p>
         <div className="price mono">KES {product.price.toLocaleString()}</div>
-        <button className="add" disabled={product.stock === 0}>
+        <button
+          className="add"
+          disabled={product.stock === 0}
+          onClick={() => addItem(product)}
+        >
           {product.stock === 0 ? 'Out of stock' : 'Add to bag'}
         </button>
       </div>
