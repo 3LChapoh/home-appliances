@@ -10,7 +10,27 @@ const app = express()
 
 connectDB()
 
-app.use(cors())
+
+const allowedOrigins = [
+  'https://rubys-choice-mern.vercel.app',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+]
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests without an Origin header
+      // such as curl/Postman/server-to-server requests.
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true)
+      }
+
+      return callback(new Error('Not allowed by CORS'))
+    },
+  })
+)
+
 app.use(express.json())
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')))
 
