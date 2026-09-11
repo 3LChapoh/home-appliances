@@ -1,9 +1,10 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 function AccountDrawer({ onClose }) {
   const { user, login, register, logout } = useAuth()
-  const [mode, setMode] = useState('login') // login | register
+  const [mode, setMode] = useState('login')
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'customer', businessName: '' })
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -38,6 +39,11 @@ function AccountDrawer({ onClose }) {
           <button className="close" onClick={onClose}>×</button>
         </div>
         <p>Signed in as <strong>{user.name}</strong> ({user.role})</p>
+        {user.role === 'vendor' && (
+          <Link className="goldbtn" to="/vendor" onClick={onClose} style={{ display: 'inline-block', marginBottom: 10 }}>
+            Boutique dashboard
+          </Link>
+        )}
         <button className="ghostbtn" onClick={logout}>Log out</button>
       </div>
     )
