@@ -12,6 +12,11 @@ const productSchema = new mongoose.Schema(
       required: [true, 'Vendor / boutique name is required'],
       trim: true,
     },
+    vendorRef: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: [true, 'Vendor account is required'],
+    },
     price: {
       type: Number,
       required: [true, 'Price (KES) is required'],
@@ -28,7 +33,7 @@ const productSchema = new mongoose.Schema(
       default: '',
     },
     images: {
-      type: [String], // stored paths, e.g. /uploads/filename.jpg
+      type: [String],
       default: [],
     },
     stock: {

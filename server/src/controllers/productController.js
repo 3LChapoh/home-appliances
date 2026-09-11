@@ -40,6 +40,16 @@ async function getProducts(req, res) {
   }
 }
 
+// GET /api/products/mine (vendor's own products)
+async function getMyProducts(req, res) {
+  try {
+    const products = await Product.find({ vendorRef: req.user._id }).sort({ createdAt: -1 })
+    res.json(products)
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch your products', error: err.message })
+  }
+}
+
 // GET /api/products/:id
 async function getProductById(req, res) {
   try {
@@ -54,13 +64,14 @@ async function getProductById(req, res) {
 // POST /api/products
 async function createProduct(req, res) {
   try {
-    const { name, vendor, price, category, description, stock } = req.body
+    const { name, price, category, description, stock } = req.body
 
     const images = (req.files || []).map((f) => `/uploads/${f.filename}`)
 
     const product = await Product.create({
       name,
-      vendor,
+      vendor: req.user.businessName,
+      vendorRef: req.user._id,
       price,
       category,
       description,
@@ -70,7 +81,6 @@ async function createProduct(req, res) {
 
     res.status(201).json(product)
   } catch (err) {
-    // clean up any uploaded files if creation failed
     if (req.files?.length) {
       deleteImageFiles(req.files.map((f) => `/uploads/${f.filename}`))
     }
@@ -84,10 +94,15 @@ async function updateProduct(req, res) {
     const product = await Product.findById(req.params.id)
     if (!product) return res.status(404).json({ message: 'Product not found' })
 
-    const { name, vendor, price, category, description, stock, replaceImages } = req.body
+    const isOwner = product.vendorRef.toString() === req.user._id.toString()
+    const isAdmin = req.user.role === 'admin'
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: 'Not authorized to edit this product' })
+    }
+
+    const { name, price, category, description, stock, replaceImages } = req.body
 
     if (name !== undefined) product.name = name
-    if (vendor !== undefined) product.vendor = vendor
     if (price !== undefined) product.price = price
     if (category !== undefined) product.category = category
     if (description !== undefined) product.description = description
@@ -97,11 +112,9 @@ async function updateProduct(req, res) {
       const newImages = req.files.map((f) => `/uploads/${f.filename}`)
 
       if (replaceImages === 'true') {
-        // swap entirely: delete old files, use only new ones
         deleteImageFiles(product.images)
         product.images = newImages
       } else {
-        // append to existing images
         product.images = [...product.images, ...newImages]
       }
     }
@@ -122,6 +135,12 @@ async function deleteProduct(req, res) {
     const product = await Product.findById(req.params.id)
     if (!product) return res.status(404).json({ message: 'Product not found' })
 
+    const isOwner = product.vendorRef.toString() === req.user._id.toString()
+    const isAdmin = req.user.role === 'admin'
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: 'Not authorized to delete this product' })
+    }
+
     deleteImageFiles(product.images)
     await product.deleteOne()
 
@@ -133,6 +152,7 @@ async function deleteProduct(req, res) {
 
 module.exports = {
   getProducts,
+  getMyProducts,
   getProductById,
   createProduct,
   updateProduct,
