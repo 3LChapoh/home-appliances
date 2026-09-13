@@ -3,6 +3,7 @@ import { ordersApi } from '../api'
 import { money } from '../data/categories'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import PasswordField from './PasswordField'
 
 export default function AccountDrawer({ onClose, refreshKey }) {
   const { user, token, login, register, logout } = useAuth()
@@ -77,7 +78,7 @@ export default function AccountDrawer({ onClose, refreshKey }) {
           </label>
           <label>
             Password
-            <input className="field" type="password" required minLength={6} value={form.password} onChange={(e) => update('password', e.target.value)} />
+            <PasswordField value={form.password} onChange={(e) => update('password', e.target.value)} required />
           </label>
           {mode === 'register' && (
             <>

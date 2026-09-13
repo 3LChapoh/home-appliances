@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useVendorAuth } from '../../context/VendorAuthContext'
 import { useToast } from '../../context/ToastContext'
+import PasswordField from '../PasswordField'
 
 export default function VendorAuthGate() {
   const { login, activate } = useVendorAuth()
@@ -57,7 +58,7 @@ export default function VendorAuthGate() {
         )}
         <label>
           {mode === 'activate' ? 'Choose a password' : 'Password'}
-          <input className="field" type="password" required minLength={6} value={form.password} onChange={(e) => update('password', e.target.value)} />
+          <PasswordField value={form.password} onChange={(e) => update('password', e.target.value)} required />
         </label>
         <button className="goldbtn" disabled={busy}>
           {busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Activate boutique'}

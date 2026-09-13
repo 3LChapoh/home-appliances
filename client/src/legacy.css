@@ -43,3 +43,28 @@ section{padding:78px 0}.section-head{display:flex;justify-content:space-between;
 @media(min-width:650px){.navlinks{display:flex}.products{grid-template-columns:repeat(3,1fr)}.controls{grid-template-columns:2fr 1fr 1fr 1fr}.search{grid-column:auto}.stats{grid-template-columns:repeat(4,1fr)}.mini-grid{grid-template-columns:repeat(3,1fr)}.footer-grid{grid-template-columns:2fr 1fr 1fr}.hero-slot:nth-child(5){top:28%}}
 @media(min-width:950px){.products{grid-template-columns:repeat(4,1fr)}.p-img{height:245px}.cat{min-width:190px;height:195px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.hero-slot{opacity:1!important}.reveal{opacity:1;transform:none}}
+
+.password-field-wrap {
+  position: relative;
+}
+.password-field-wrap input {
+  width: 100%;
+  padding-right: 44px;
+}
+.password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted, #999);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease;
+}
+.password-toggle:hover {
+  color: var(--gold, #c9a24b);
+}

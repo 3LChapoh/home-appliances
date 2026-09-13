@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { useToast } from '../../context/ToastContext'
+import PasswordField from '../PasswordField'
 
 export default function AdminAuthGate() {
   const { login } = useAdminAuth()
@@ -33,11 +34,11 @@ export default function AdminAuthGate() {
         </label>
         <label>
           Password
-          <input className="field" type="password" required value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
+          <PasswordField value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} required />
         </label>
         <label>
           Security Key
-          <input className="field" type="password" required value={form.securityKey} onChange={(e) => setForm((f) => ({ ...f, securityKey: e.target.value }))} />
+          <PasswordField value={form.securityKey} onChange={(e) => setForm((f) => ({ ...f, securityKey: e.target.value }))} required />
         </label>
         <button className="goldbtn" disabled={busy}>
           {busy ? 'Please wait…' : 'Sign in'}
