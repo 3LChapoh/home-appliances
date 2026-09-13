@@ -1,23 +1,15 @@
 const multer = require('multer')
-const path = require('path')
-const fs = require('fs')
+const { CloudinaryStorage } = require('multer-storage-cloudinary')
+const cloudinary = require('../config/cloudinary')
 
-const uploadDir = path.join(__dirname, '..', '..', 'uploads')
-
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true })
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir)
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname)
-    const base = path
-      .basename(file.originalname, ext)
-      .replace(/[^a-zA-Z0-9-_]/g, '-')
-    cb(null, `${base}-${Date.now()}${ext}`)
+// Files upload straight to Cloudinary, so nothing touches the server's local
+// disk — safe across Render redeploys (a local disk would get wiped).
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'rubys-choice/products',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [{ width: 1600, height: 2000, crop: 'limit' }],
   },
 })
 

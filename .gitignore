@@ -6,3 +6,4 @@ dist/
 build/
 .DS_Store
 npm-debug.log*
+server/uploads/

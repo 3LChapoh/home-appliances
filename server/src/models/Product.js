@@ -12,11 +12,6 @@ const productSchema = new mongoose.Schema(
       required: [true, 'Vendor / boutique name is required'],
       trim: true,
     },
-    vendorRef: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'Vendor account is required'],
-    },
     price: {
       type: Number,
       required: [true, 'Price (KES) is required'],
@@ -33,8 +28,16 @@ const productSchema = new mongoose.Schema(
       default: '',
     },
     images: {
-      type: [String],
+      // Cloudinary-hosted images: url is what the client displays,
+      // publicId is what we need to delete the asset from Cloudinary later.
+      type: [
+        {
+          url: { type: String, required: true },
+          publicId: { type: String, required: true },
+        },
+      ],
       default: [],
+      _id: false,
     },
     stock: {
       type: Number,

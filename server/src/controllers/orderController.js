@@ -1,200 +1,184 @@
+const mongoose = require('mongoose')
 const Order = require('../models/Order')
 const Product = require('../models/Product')
 
-function generateOrderNumber() {
-  const stamp = Date.now().toString(36).toUpperCase().slice(-6)
-  return `RC-${stamp}`
-}
-
 // POST /api/orders
-exports.createOrder = async (req, res, next) => {
+// body: { items: [{ productId, qty }], customerName, customerEmail, customerPhone, deliveryLocation, paymentMethod }
+async function createOrder(req, res) {
+  const session = await mongoose.startSession()
   try {
-    const { items, deliveryAddress, paymentMethod } = req.body
+    let created
+    await session.withTransaction(async () => {
+      const { items, customerName, customerEmail, customerPhone, deliveryLocation, paymentMethod } = req.body
 
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: 'Cart is empty' })
-    }
-    if (!deliveryAddress || !deliveryAddress.recipientName || !deliveryAddress.phone || !deliveryAddress.estate) {
-      return res.status(400).json({ message: 'Delivery address is incomplete' })
-    }
-
-    const productIds = items.map((i) => i.product)
-    const products = await Product.find({ _id: { $in: productIds } })
-    const productMap = new Map(products.map((p) => [p._id.toString(), p]))
-
-    const vendorGroups = new Map()
-
-    for (const requested of items) {
-      const product = productMap.get(requested.product)
-      if (!product) {
-        return res.status(404).json({ message: `Product ${requested.product} not found` })
+      if (!Array.isArray(items) || items.length === 0) {
+        throw Object.assign(new Error('Order must include at least one item'), { status: 400 })
       }
-      if (!requested.quantity || requested.quantity < 1) {
-        return res.status(400).json({ message: `Invalid quantity for ${product.name}` })
-      }
-      if (typeof product.stock === 'number' && product.stock < requested.quantity) {
-        return res.status(400).json({ message: `${product.name} is out of stock` })
+      if (!customerName || !customerEmail || !deliveryLocation || !paymentMethod) {
+        throw Object.assign(
+          new Error('Customer name, email, delivery location and payment method are required'),
+          { status: 400 }
+        )
       }
 
-      const vendorId = product.vendorRef.toString()
-      if (!vendorGroups.has(vendorId)) {
-        vendorGroups.set(vendorId, {
-          vendor: product.vendorRef,
-          vendorName: product.vendor,
-          items: [],
-          subtotal: 0,
+      const orderItems = []
+      let total = 0
+      const vendorSet = new Set()
+
+      for (const { productId, qty } of items) {
+        const quantity = Number(qty) || 0
+        if (quantity < 1) continue
+
+        const product = await Product.findById(productId).session(session)
+        if (!product) {
+          throw Object.assign(new Error(`Product ${productId} not found`), { status: 404 })
+        }
+        if (product.stock < quantity) {
+          throw Object.assign(
+            new Error(`Only ${product.stock} left in stock for "${product.name}"`),
+            { status: 409 }
+          )
+        }
+
+        product.stock -= quantity
+        await product.save({ session })
+
+        orderItems.push({
+          product: product._id,
+          name: product.name,
+          vendor: product.vendor,
+          price: product.price,
+          qty: quantity,
         })
+        total += product.price * quantity
+        vendorSet.add(product.vendor)
       }
 
-      const group = vendorGroups.get(vendorId)
-      group.items.push({
-        product: product._id,
-        name: product.name,
-        image: product.images?.[0] || '',
-        price: product.price,
-        quantity: requested.quantity,
-      })
-      group.subtotal += product.price * requested.quantity
-    }
+      if (orderItems.length === 0) {
+        throw Object.assign(new Error('Order must include at least one valid item'), { status: 400 })
+      }
 
-    const vendorOrders = Array.from(vendorGroups.values())
-    const totalAmount = vendorOrders.reduce((sum, g) => sum + g.subtotal, 0)
-
-    const order = await Order.create({
-      customer: req.user._id,
-      orderNumber: generateOrderNumber(),
-      vendorOrders,
-      totalAmount,
-      deliveryAddress,
-      paymentMethod: paymentMethod || 'pay_on_delivery',
+      const [order] = await Order.create(
+        [
+          {
+            customer: req.auth?.role === 'customer' ? req.auth.id : undefined,
+            customerName,
+            customerEmail,
+            customerPhone,
+            deliveryLocation,
+            paymentMethod,
+            items: orderItems,
+            vendors: [...vendorSet],
+            total,
+          },
+        ],
+        { session }
+      )
+      created = order
     })
 
-    await Promise.all(
-      items.map((i) => Product.findByIdAndUpdate(i.product, { $inc: { stock: -i.quantity } }))
-    )
-
-    res.status(201).json(order)
+    res.status(201).json(created)
   } catch (err) {
-    next(err)
+    res.status(err.status || 500).json({ message: err.message || 'Failed to place order' })
+  } finally {
+    session.endSession()
   }
 }
 
-// GET /api/orders/my-orders
-exports.getMyOrders = async (req, res, next) => {
+// GET /api/orders/mine  (signed-in customer)
+async function getMyOrders(req, res) {
   try {
-    const orders = await Order.find({ customer: req.user._id }).sort({ createdAt: -1 })
+    const orders = await Order.find({ customer: req.auth.id }).sort({ createdAt: -1 })
     res.json(orders)
   } catch (err) {
-    next(err)
+    res.status(500).json({ message: 'Failed to fetch orders', error: err.message })
   }
 }
 
-// GET /api/orders/:id
-exports.getOrderById = async (req, res, next) => {
+// GET /api/orders/vendor  (signed-in vendor) — orders containing this vendor's boutique
+async function getVendorOrders(req, res) {
   try {
-    const order = await Order.findById(req.params.id)
-    if (!order) return res.status(404).json({ message: 'Order not found' })
-
-    const isOwner = order.customer.toString() === req.user._id.toString()
-    const isInvolvedVendor = order.vendorOrders.some(
-      (vo) => vo.vendor.toString() === req.user._id.toString()
-    )
-    const isAdmin = req.user.role === 'admin'
-
-    if (!isOwner && !isInvolvedVendor && !isAdmin) {
-      return res.status(403).json({ message: 'Not authorized to view this order' })
-    }
-
-    res.json(order)
+    const orders = await Order.find({ vendors: req.vendor.boutiqueName }).sort({ createdAt: -1 })
+    res.json(orders)
   } catch (err) {
-    next(err)
+    res.status(500).json({ message: 'Failed to fetch orders', error: err.message })
   }
 }
 
-// GET /api/orders/vendor-orders
-exports.getVendorOrders = async (req, res, next) => {
+// GET /api/orders  (admin) — all orders
+async function getAllOrders(req, res) {
   try {
-    const orders = await Order.find({ 'vendorOrders.vendor': req.user._id }).sort({ createdAt: -1 })
-
-    const scoped = orders.map((order) => {
-      const mine = order.vendorOrders.find((vo) => vo.vendor.toString() === req.user._id.toString())
-      return {
-        _id: order._id,
-        orderNumber: order.orderNumber,
-        customer: order.customer,
-        deliveryAddress: order.deliveryAddress,
-        paymentMethod: order.paymentMethod,
-        paymentStatus: order.paymentStatus,
-        createdAt: order.createdAt,
-        vendorOrder: mine,
-      }
-    })
-
-    res.json(scoped)
-  } catch (err) {
-    next(err)
-  }
-}
-
-// PATCH /api/orders/:id/vendor-status
-exports.updateVendorOrderStatus = async (req, res, next) => {
-  try {
-    const { status, vendorNotes } = req.body
-    const order = await Order.findById(req.params.id)
-    if (!order) return res.status(404).json({ message: 'Order not found' })
-
-    const vendorOrder = order.vendorOrders.find(
-      (vo) => vo.vendor.toString() === req.user._id.toString()
-    )
-    if (!vendorOrder) {
-      return res.status(403).json({ message: 'You do not have items in this order' })
-    }
-
-    if (status) vendorOrder.status = status
-    if (vendorNotes !== undefined) vendorOrder.vendorNotes = vendorNotes
-
-    order.recalculateOverallStatus()
-    await order.save()
-
-    res.json(order)
-  } catch (err) {
-    next(err)
-  }
-}
-
-// GET /api/orders
-exports.getAllOrders = async (req, res, next) => {
-  try {
-    const { status } = req.query
-    const filter = status ? { overallStatus: status } : {}
+    const filter = {}
+    if (req.query.status) filter.status = req.query.status
     const orders = await Order.find(filter).sort({ createdAt: -1 })
     res.json(orders)
   } catch (err) {
-    next(err)
+    res.status(500).json({ message: 'Failed to fetch orders', error: err.message })
   }
 }
 
-// PATCH /api/orders/:id/cancel
-exports.cancelOrder = async (req, res, next) => {
+// PUT /api/orders/:id/status  (vendor or admin) — body: { status }
+async function updateStatus(req, res) {
   try {
+    const { status } = req.body
+    const allowed = ['Pending', 'Processing', 'Completed', 'Cancelled']
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ message: `Status must be one of: ${allowed.join(', ')}` })
+    }
+
     const order = await Order.findById(req.params.id)
     if (!order) return res.status(404).json({ message: 'Order not found' })
 
-    if (order.customer.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized to cancel this order' })
-    }
-    if (order.overallStatus !== 'pending') {
-      return res.status(400).json({ message: 'Order can no longer be cancelled' })
+    if (req.auth.role === 'vendor' && !order.vendors.includes(req.vendor.boutiqueName)) {
+      return res.status(403).json({ message: 'This order does not belong to your boutique' })
     }
 
-    order.vendorOrders.forEach((vo) => {
-      vo.status = 'cancelled'
-    })
-    order.recalculateOverallStatus()
+    if (status === 'Cancelled' && order.status !== 'Cancelled') {
+      await restockOrder(order)
+    }
+
+    order.status = status
     await order.save()
-
     res.json(order)
   } catch (err) {
-    next(err)
+    res.status(400).json({ message: 'Failed to update order', error: err.message })
   }
+}
+
+// PUT /api/orders/:id/cancel  (customer who placed it) — cancels and restocks
+async function cancelMyOrder(req, res) {
+  try {
+    const order = await Order.findOne({ _id: req.params.id, customer: req.auth.id })
+    if (!order) return res.status(404).json({ message: 'Order not found' })
+    if (order.status === 'Cancelled') {
+      return res.status(400).json({ message: 'Order is already cancelled' })
+    }
+    if (order.status === 'Completed') {
+      return res.status(400).json({ message: 'Completed orders cannot be cancelled' })
+    }
+
+    await restockOrder(order)
+    order.status = 'Cancelled'
+    await order.save()
+    res.json(order)
+  } catch (err) {
+    res.status(400).json({ message: 'Failed to cancel order', error: err.message })
+  }
+}
+
+async function restockOrder(order) {
+  await Promise.all(
+    order.items.map((item) =>
+      Product.findByIdAndUpdate(item.product, { $inc: { stock: item.qty } })
+    )
+  )
+}
+
+module.exports = {
+  createOrder,
+  getMyOrders,
+  getVendorOrders,
+  getAllOrders,
+  updateStatus,
+  cancelMyOrder,
 }

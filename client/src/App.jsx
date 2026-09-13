@@ -1,27 +1,124 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { ToastProvider } from './context/ToastContext'
 import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
-import Home from './pages/Home'
-import AllProducts from './pages/AllProducts'
-import VendorDashboard from './pages/VendorDashboard'
-import './legacy.css'
+import { FavouritesProvider } from './context/FavouritesContext'
+import { ContactProvider } from './context/ContactContext'
+import { productsApi } from './api'
 
-function App() {
+import Header from './components/Header'
+import Hero from './components/Hero'
+import CategoryStrip from './components/CategoryStrip'
+import ProductGrid from './components/ProductGrid'
+import PartnerSection from './components/PartnerSection'
+import Footer from './components/Footer'
+import BottomNav from './components/BottomNav'
+import DrawerOverlay from './components/DrawerOverlay'
+import CartDrawer from './components/CartDrawer'
+import AccountDrawer from './components/AccountDrawer'
+import FavouritesDrawer from './components/FavouritesDrawer'
+import VendorPortal from './pages/VendorPortal'
+import AdminPortal from './pages/AdminPortal'
+
+function AppShell() {
+  const [theme, setTheme] = useState(() => localStorage.getItem('rc_theme') || 'dark')
+  const [drawer, setDrawer] = useState(null) // 'cart' | 'account' | 'favourites' | null
+  const [pendingCategory, setPendingCategory] = useState(null)
+  const [ordersRefreshKey, setOrdersRefreshKey] = useState(0)
+  const [stats, setStats] = useState({ boutiques: '—', fragrances: '—' })
+
+  useEffect(() => {
+    document.body.classList.toggle('light', theme === 'light')
+    localStorage.setItem('rc_theme', theme)
+  }, [theme])
+
+  useEffect(() => {
+    productsApi
+      .list()
+      .then((data) => {
+        if (!Array.isArray(data)) return
+        setStats({
+          boutiques: new Set(data.map((p) => p.vendor)).size,
+          fragrances: data.length,
+        })
+      })
+      .catch(() => {})
+  }, [])
+
+  function closeDrawer() {
+    setDrawer(null)
+  }
+
   return (
-    <AuthProvider>
-      <CartProvider>
-        <BrowserRouter>
-          <div id="app-root">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/products" element={<AllProducts />} />
-              <Route path="/vendor" element={<VendorDashboard />} />
-            </Routes>
-          </div>
-        </BrowserRouter>
-      </CartProvider>
-    </AuthProvider>
+    <>
+      <a className="skip-link" href="#collection">
+        Skip to collection
+      </a>
+      <Header
+        theme={theme}
+        onToggleTheme={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
+        onOpenCart={() => setDrawer('cart')}
+        onOpenAccount={() => setDrawer('account')}
+      />
+
+      <main>
+        <Hero stats={stats} />
+        <CategoryStrip onSelect={(id) => setPendingCategory(id)} />
+        <ProductGrid initialCategory={pendingCategory} onCategoryConsumed={() => setPendingCategory(null)} />
+        <PartnerSection />
+      </main>
+
+      <Footer />
+
+      <BottomNav
+        theme={theme}
+        onToggleTheme={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
+        onOpenCart={() => setDrawer('cart')}
+        onOpenAccount={() => setDrawer('account')}
+        onOpenFavourites={() => setDrawer('favourites')}
+      />
+
+      <DrawerOverlay open={!!drawer} onClose={closeDrawer}>
+        {drawer === 'cart' && (
+          <CartDrawer onClose={closeDrawer} onOrdersUpdated={() => setOrdersRefreshKey((k) => k + 1)} />
+        )}
+        {drawer === 'account' && <AccountDrawer onClose={closeDrawer} refreshKey={ordersRefreshKey} />}
+        {drawer === 'favourites' && <FavouritesDrawer onClose={closeDrawer} />}
+      </DrawerOverlay>
+    </>
   )
 }
 
-export default App
+// Minimal hash router: '#/vendor' and '#/admin' load their own portals with
+// their own auth sessions, entirely separate from the customer storefront below.
+export default function App() {
+  const [route, setRoute] = useState(() => window.location.hash)
+
+  useEffect(() => {
+    function onHashChange() {
+      setRoute(window.location.hash)
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+
+  return (
+    <ToastProvider>
+      {route.startsWith('#/vendor') ? (
+        <VendorPortal />
+      ) : route.startsWith('#/admin') ? (
+        <AdminPortal />
+      ) : (
+        <AuthProvider>
+          <FavouritesProvider>
+            <CartProvider>
+              <ContactProvider>
+                <AppShell />
+              </ContactProvider>
+            </CartProvider>
+          </FavouritesProvider>
+        </AuthProvider>
+      )}
+    </ToastProvider>
+  )
+}

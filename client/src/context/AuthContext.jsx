@@ -1,48 +1,61 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { loginUser, registerUser, fetchMe } from '../api/auth'
+import { usersApi } from '../api'
 
 const AuthContext = createContext(null)
+const TOKEN_KEY = 'rc_token'
+const USER_KEY = 'rc_user'
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [status, setStatus] = useState('loading') // loading | ready
-
-  useEffect(() => {
-    const token = localStorage.getItem('rc_token')
-    if (!token) {
-      setStatus('ready')
-      return
+  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) || null)
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(USER_KEY) || 'null')
+    } catch {
+      return null
     }
+  })
 
-    fetchMe()
-      .then((data) => setUser(data))
-      .catch(() => {
-        localStorage.removeItem('rc_token')
+  // keep localStorage in sync, and drop stale sessions if the token turns out invalid
+  useEffect(() => {
+    if (!token) return
+    usersApi
+      .me(token)
+      .then((freshUser) => {
+        setUser(freshUser)
+        localStorage.setItem(USER_KEY, JSON.stringify(freshUser))
       })
-      .finally(() => setStatus('ready'))
+      .catch(() => logout())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  function persist(nextToken, nextUser) {
+    setToken(nextToken)
+    setUser(nextUser)
+    localStorage.setItem(TOKEN_KEY, nextToken)
+    localStorage.setItem(USER_KEY, JSON.stringify(nextUser))
+  }
+
   async function login(email, password) {
-    const data = await loginUser({ email, password })
-    localStorage.setItem('rc_token', data.token)
-    setUser(data)
-    return data
+    const { token: t, user: u } = await usersApi.login({ email, password })
+    persist(t, u)
+    return u
   }
 
   async function register(payload) {
-    const data = await registerUser(payload)
-    localStorage.setItem('rc_token', data.token)
-    setUser(data)
-    return data
+    const { token: t, user: u } = await usersApi.register(payload)
+    persist(t, u)
+    return u
   }
 
   function logout() {
-    localStorage.removeItem('rc_token')
+    setToken(null)
     setUser(null)
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
   }
 
   return (
-    <AuthContext.Provider value={{ user, status, login, register, logout }}>
+    <AuthContext.Provider value={{ token, user, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   )
@@ -50,6 +63,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider')
   return ctx
 }

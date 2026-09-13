@@ -24,37 +24,30 @@ const userSchema = new mongoose.Schema(
     phone: {
       type: String,
       trim: true,
+      default: '',
+    },
+    address: {
+      type: String,
+      trim: true,
+      default: '',
     },
     role: {
       type: String,
-      enum: ['customer', 'vendor', 'admin'],
+      enum: ['customer', 'admin'],
       default: 'customer',
-    },
-    // vendor-only fields
-    businessName: {
-      type: String,
-      trim: true,
-    },
-    businessDescription: {
-      type: String,
-      trim: true,
-    },
-    isApprovedVendor: {
-      type: Boolean,
-      default: false,
     },
   },
   { timestamps: true }
 )
 
-userSchema.pre('save', async function (next) {
+userSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) return next()
   const salt = await bcrypt.genSalt(10)
   this.password = await bcrypt.hash(this.password, salt)
   next()
 })
 
-userSchema.methods.comparePassword = async function (candidate) {
+userSchema.methods.matchPassword = function matchPassword(candidate) {
   return bcrypt.compare(candidate, this.password)
 }
 

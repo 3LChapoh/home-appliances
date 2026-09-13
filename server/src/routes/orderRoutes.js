@@ -1,25 +1,24 @@
 const express = require('express')
 const router = express.Router()
-const { protect, authorize } = require('../middleware/auth')
+const { protect, optionalAuth, requireRole, attachVendor, attachVendorIfVendor } = require('../middleware/auth')
 const {
   createOrder,
   getMyOrders,
-  getOrderById,
   getVendorOrders,
-  updateVendorOrderStatus,
   getAllOrders,
-  cancelOrder,
+  updateStatus,
+  cancelMyOrder,
 } = require('../controllers/orderController')
 
-router.post('/', protect, authorize('customer'), createOrder)
-router.get('/my-orders', protect, authorize('customer'), getMyOrders)
-router.patch('/:id/cancel', protect, authorize('customer'), cancelOrder)
+// guest checkout allowed; optionalAuth attaches req.auth if a customer is signed in
+router.post('/', optionalAuth, createOrder)
 
-router.get('/vendor-orders', protect, authorize('vendor'), getVendorOrders)
-router.patch('/:id/vendor-status', protect, authorize('vendor'), updateVendorOrderStatus)
+router.get('/mine', protect, requireRole('customer'), getMyOrders)
+router.put('/:id/cancel', protect, requireRole('customer'), cancelMyOrder)
 
-router.get('/', protect, authorize('admin'), getAllOrders)
+router.get('/vendor', protect, requireRole('vendor'), attachVendor, getVendorOrders)
 
-router.get('/:id', protect, getOrderById)
+router.get('/', protect, requireRole('admin'), getAllOrders)
+router.put('/:id/status', protect, requireRole('vendor', 'admin'), attachVendorIfVendor, updateStatus)
 
 module.exports = router

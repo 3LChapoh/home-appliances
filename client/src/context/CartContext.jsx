@@ -1,55 +1,72 @@
-import { createContext, useContext, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
+import { useToast } from './ToastContext'
 
 const CartContext = createContext(null)
+const CART_KEY = 'rc_cart'
 
 export function CartProvider({ children }) {
-  const [items, setItems] = useState([]) // [{ product, name, price, image, stock, quantity }]
+  const showToast = useToast()
+  const [items, setItems] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(CART_KEY) || '[]')
+    } catch {
+      return []
+    }
+  })
 
-  function addItem(product, quantity = 1) {
+  useEffect(() => {
+    localStorage.setItem(CART_KEY, JSON.stringify(items))
+  }, [items])
+
+  function addItem(product) {
+    if (product.stock <= 0) return showToast('Sorry, that item is out of stock', true)
+
     setItems((prev) => {
-      const existing = prev.find((i) => i.product === product._id)
+      const existing = prev.find((i) => i.productId === product._id)
       if (existing) {
-        return prev.map((i) =>
-          i.product === product._id ? { ...i, quantity: i.quantity + quantity } : i
-        )
+        if (existing.qty >= product.stock) {
+          showToast(`Only ${product.stock} left in stock`, true)
+          return prev
+        }
+        return prev.map((i) => (i.productId === product._id ? { ...i, qty: i.qty + 1 } : i))
       }
       return [
         ...prev,
         {
-          product: product._id,
+          productId: product._id,
           name: product.name,
+          vendor: product.vendor,
           price: product.price,
-          image: product.images?.[0] || '',
+          image: product.images?.[0]?.url,
           stock: product.stock,
-          quantity,
+          qty: 1,
         },
       ]
     })
+    showToast('Added to your bag')
   }
 
-  function updateQuantity(productId, quantity) {
-    if (quantity < 1) {
-      removeItem(productId)
-      return
-    }
-    setItems((prev) => prev.map((i) => (i.product === productId ? { ...i, quantity } : i)))
+  function changeQty(productId, delta) {
+    setItems((prev) =>
+      prev
+        .map((i) => (i.productId === productId ? { ...i, qty: i.qty + delta } : i))
+        .filter((i) => i.qty > 0)
+    )
   }
 
   function removeItem(productId) {
-    setItems((prev) => prev.filter((i) => i.product !== productId))
+    setItems((prev) => prev.filter((i) => i.productId !== productId))
   }
 
-  function clearCart() {
+  function clear() {
     setItems([])
   }
 
-  const total = useMemo(() => items.reduce((sum, i) => sum + i.price * i.quantity, 0), [items])
-  const count = useMemo(() => items.reduce((sum, i) => sum + i.quantity, 0), [items])
+  const count = items.reduce((n, i) => n + i.qty, 0)
+  const total = items.reduce((n, i) => n + i.price * i.qty, 0)
 
   return (
-    <CartContext.Provider
-      value={{ items, addItem, updateQuantity, removeItem, clearCart, total, count }}
-    >
+    <CartContext.Provider value={{ items, addItem, changeQty, removeItem, clear, count, total }}>
       {children}
     </CartContext.Provider>
   )
@@ -57,6 +74,6 @@ export function CartProvider({ children }) {
 
 export function useCart() {
   const ctx = useContext(CartContext)
-  if (!ctx) throw new Error('useCart must be used within CartProvider')
+  if (!ctx) throw new Error('useCart must be used within a CartProvider')
   return ctx
 }

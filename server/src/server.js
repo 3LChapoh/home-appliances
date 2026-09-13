@@ -1,46 +1,40 @@
 require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
-const path = require('path')
 const connectDB = require('./config/db')
 const productRoutes = require('./routes/productRoutes')
-const authRoutes = require('./routes/authRoutes')
+const userRoutes = require('./routes/userRoutes')
+const vendorRoutes = require('./routes/vendorRoutes')
 const orderRoutes = require('./routes/orderRoutes')
 
 const app = express()
 
+if (!process.env.JWT_SECRET) {
+  console.error('JWT_SECRET is not set in .env')
+  process.exit(1)
+}
+
 connectDB()
 
-
-const allowedOrigins = [
-  'https://rubys-choice-mern.vercel.app',
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-]
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests without an Origin header
-      // such as curl/Postman/server-to-server requests.
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true)
-      }
-
-      return callback(new Error('Not allowed by CORS'))
-    },
-  })
-)
-
+app.use(cors())
 app.use(express.json())
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')))
 
 app.use('/api/products', productRoutes)
-app.use('/api/auth', authRoutes)
+app.use('/api/users', userRoutes)
+app.use('/api/vendors', vendorRoutes)
 app.use('/api/orders', orderRoutes)
 
 app.get('/', (req, res) => {
   res.json({ message: "Ruby's Choice API is running" })
+})
+
+// Public, non-sensitive contact info the client can render without a rebuild
+// (change the numbers in Render's env vars any time, no redeploy of the client needed).
+app.get('/api/config', (req, res) => {
+  res.json({
+    whatsapp: process.env.RUBYS_CHOICE_WHATSAPP || '',
+    email: process.env.RUBYS_CHOICE_EMAIL || '',
+  })
 })
 
 // centralized error handler (catches multer errors, thrown errors, etc.)
