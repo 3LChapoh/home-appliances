@@ -58,6 +58,7 @@ export const productsApi = {
 export const usersApi = {
   register: (payload) => request('/api/users/register', { method: 'POST', body: payload }),
   login: (payload) => request('/api/users/login', { method: 'POST', body: payload }),
+  adminLogin: (payload) => request('/api/users/admin-login', { method: 'POST', body: payload }),
   me: (token) => request('/api/users/me', { token }),
   updateMe: (payload, token) => request('/api/users/me', { method: 'PUT', body: payload, token }),
 }

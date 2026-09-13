@@ -6,13 +6,13 @@ export default function AdminAuthGate() {
   const { login } = useAdminAuth()
   const showToast = useToast()
   const [busy, setBusy] = useState(false)
-  const [form, setForm] = useState({ email: '', password: '' })
+  const [form, setForm] = useState({ email: '', password: '', securityKey: '' })
 
   async function submit(e) {
     e.preventDefault()
     setBusy(true)
     try {
-      await login(form.email, form.password)
+      await login(form.email, form.password, form.securityKey)
     } catch (err) {
       showToast(err.message || 'Sign in failed', true)
     } finally {
@@ -34,6 +34,10 @@ export default function AdminAuthGate() {
         <label>
           Password
           <input className="field" type="password" required value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
+        </label>
+        <label>
+          Security Key
+          <input className="field" type="password" required value={form.securityKey} onChange={(e) => setForm((f) => ({ ...f, securityKey: e.target.value }))} />
         </label>
         <button className="goldbtn" disabled={busy}>
           {busy ? 'Please wait…' : 'Sign in'}

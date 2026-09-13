@@ -15,11 +15,8 @@ export function AdminAuthProvider({ children }) {
     }
   })
 
-  async function login(email, password) {
-    const { token: t, user } = await usersApi.login({ email, password })
-    if (user.role !== 'admin') {
-      throw new Error('This account does not have admin access')
-    }
+  async function login(email, password, securityKey) {
+    const { token: t, user } = await usersApi.adminLogin({ email, password, securityKey })
     setToken(t)
     setAdmin(user)
     localStorage.setItem(TOKEN_KEY, t)
