@@ -1,8 +1,8 @@
 const Vendor = require('../models/Vendor')
 const generateToken = require('../utils/generateToken')
 
-function toPublic(vendor) {
-  return {
+function toPublic(vendor, includePin = false) {
+  const pub = {
     _id: vendor._id,
     boutiqueName: vendor.boutiqueName,
     contactName: vendor.contactName,
@@ -12,6 +12,10 @@ function toPublic(vendor) {
     status: vendor.status,
     activated: vendor.activated,
   }
+  if (includePin && vendor.status === 'approved' && !vendor.activated && vendor.activationPin) {
+    pub.activationPin = vendor.activationPin
+  }
+  return pub
 }
 
 function generatePin() {
@@ -40,12 +44,14 @@ async function apply(req, res) {
 }
 
 // GET /api/vendors  (admin) — list all vendors/applications, optional ?status=pending
+// Includes the activation PIN for approved-but-not-yet-activated vendors, so admins
+// can view/resend it any time, not just the moment of approval.
 async function listVendors(req, res) {
   try {
     const filter = {}
     if (req.query.status) filter.status = req.query.status
-    const vendors = await Vendor.find(filter).sort({ createdAt: -1 })
-    res.json(vendors)
+    const vendors = await Vendor.find(filter).select('+activationPin').sort({ createdAt: -1 })
+    res.json(vendors.map((v) => toPublic(v, true)))
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch vendors', error: err.message })
   }
@@ -63,8 +69,7 @@ async function approveVendor(req, res) {
     vendor.activated = false
     await vendor.save()
 
-    // In production this PIN would be emailed/SMS'd to the vendor rather than returned here.
-    res.json({ ...toPublic(vendor), activationPin: pin })
+    res.json(toPublic(vendor, true))
   } catch (err) {
     res.status(400).json({ message: 'Approval failed', error: err.message })
   }

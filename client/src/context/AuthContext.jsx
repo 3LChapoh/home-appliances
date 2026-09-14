@@ -15,7 +15,6 @@ export function AuthProvider({ children }) {
     }
   })
 
-  // keep localStorage in sync, and drop stale sessions if the token turns out invalid
   useEffect(() => {
     if (!token) return
     usersApi
@@ -47,6 +46,13 @@ export function AuthProvider({ children }) {
     return u
   }
 
+  async function updateProfile(payload) {
+    const updated = await usersApi.updateMe(payload, token)
+    setUser(updated)
+    localStorage.setItem(USER_KEY, JSON.stringify(updated))
+    return updated
+  }
+
   function logout() {
     setToken(null)
     setUser(null)
@@ -55,7 +61,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ token, user, login, register, logout }}>
+    <AuthContext.Provider value={{ token, user, login, register, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   )

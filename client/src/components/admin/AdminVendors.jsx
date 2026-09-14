@@ -5,13 +5,31 @@ import { useToast } from '../../context/ToastContext'
 
 const FILTERS = ['pending', 'approved', 'rejected']
 
+// Normalizes common Kenyan phone formats (07XX XXX XXX, +2547XX..., 2547XX...)
+// into the 2547XXXXXXXX shape wa.me requires.
+function toWhatsappNumber(raw) {
+  const digits = (raw || '').replace(/\D/g, '')
+  if (digits.startsWith('254')) return digits
+  if (digits.startsWith('0')) return '254' + digits.slice(1)
+  if (digits.startsWith('7') || digits.startsWith('1')) return '254' + digits
+  return digits
+}
+
+function waLink(vendor) {
+  const number = toWhatsappNumber(vendor.phone)
+  const message =
+    vendor.status === 'approved' && !vendor.activated && vendor.activationPin
+      ? `Hi ${vendor.contactName}, your boutique "${vendor.boutiqueName}" has been approved on Ruby's Choice! Activate your account with PIN: ${vendor.activationPin}`
+      : `Hi ${vendor.contactName}, following up on your Ruby's Choice boutique application.`
+  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`
+}
+
 export default function AdminVendors() {
   const { token } = useAdminAuth()
   const showToast = useToast()
   const [filter, setFilter] = useState('pending')
   const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
-  const [issuedPin, setIssuedPin] = useState(null) // { vendorId, pin }
 
   function reload() {
     setLoading(true)
@@ -26,8 +44,7 @@ export default function AdminVendors() {
 
   async function approve(id) {
     try {
-      const result = await vendorsApi.approve(id, token)
-      setIssuedPin({ vendorId: id, pin: result.activationPin })
+      await vendorsApi.approve(id, token)
       showToast('Vendor approved')
       reload()
     } catch (err) {
@@ -69,21 +86,28 @@ export default function AdminVendors() {
             <div className="muted" style={{ fontSize: 10, marginTop: 6 }}>
               {v.activated ? 'Activated' : v.status === 'approved' ? 'Approved, awaiting activation' : v.status}
             </div>
-            {issuedPin?.vendorId === v._id && (
+            {v.activationPin && (
               <div className="notice" style={{ marginTop: 8 }}>
-                Activation PIN: <b className="mono">{issuedPin.pin}</b> — share this with the vendor.
+                Activation PIN: <b className="mono">{v.activationPin}</b>
               </div>
             )}
-            {filter === 'pending' && (
-              <div className="actions" style={{ marginTop: 8 }}>
-                <button className="tiny ok" onClick={() => approve(v._id)}>
-                  Approve
-                </button>
-                <button className="tiny danger" onClick={() => reject(v._id)}>
-                  Reject
-                </button>
-              </div>
-            )}
+            <div className="actions" style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {filter === 'pending' && (
+                <>
+                  <button className="tiny ok" onClick={() => approve(v._id)}>
+                    Approve
+                  </button>
+                  <button className="tiny danger" onClick={() => reject(v._id)}>
+                    Reject
+                  </button>
+                </>
+              )}
+              {(v.status === 'approved' || filter === 'pending') && (
+                <a className="tiny" href={waLink(v)} target="_blank" rel="noreferrer">
+                  Message on WhatsApp
+                </a>
+              )}
+            </div>
           </div>
         ))}
       </div>
