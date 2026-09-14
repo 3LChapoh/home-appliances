@@ -6,6 +6,7 @@ const productRoutes = require('./routes/productRoutes')
 const userRoutes = require('./routes/userRoutes')
 const vendorRoutes = require('./routes/vendorRoutes')
 const orderRoutes = require('./routes/orderRoutes')
+const configRoutes = require('./routes/configRoutes')
 
 const app = express()
 
@@ -23,18 +24,10 @@ app.use('/api/products', productRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/vendors', vendorRoutes)
 app.use('/api/orders', orderRoutes)
+app.use('/api/config', configRoutes)
 
 app.get('/', (req, res) => {
   res.json({ message: "Ruby's Choice API is running" })
-})
-
-// Public, non-sensitive contact info the client can render without a rebuild
-// (change the numbers in Render's env vars any time, no redeploy of the client needed).
-app.get('/api/config', (req, res) => {
-  res.json({
-    whatsapp: process.env.RUBYS_CHOICE_WHATSAPP || '',
-    email: process.env.RUBYS_CHOICE_EMAIL || '',
-  })
 })
 
 // centralized error handler (catches multer errors, thrown errors, etc.)

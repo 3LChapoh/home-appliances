@@ -4,7 +4,7 @@ import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
 import { FavouritesProvider } from './context/FavouritesContext'
 import { ContactProvider } from './context/ContactContext'
-import { productsApi } from './api'
+import { productsApi, configApi } from './api'
 
 import Header from './components/Header'
 import Hero from './components/Hero'
@@ -26,6 +26,7 @@ function AppShell() {
   const [pendingCategory, setPendingCategory] = useState(null)
   const [ordersRefreshKey, setOrdersRefreshKey] = useState(0)
   const [stats, setStats] = useState({ boutiques: '—', fragrances: '—' })
+  const [heroImages, setHeroImages] = useState([])
 
   useEffect(() => {
     document.body.classList.toggle('light', theme === 'light')
@@ -41,6 +42,15 @@ function AppShell() {
           boutiques: new Set(data.map((p) => p.vendor)).size,
           fragrances: data.length,
         })
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    configApi
+      .get()
+      .then((data) => {
+        if (data && Array.isArray(data.heroImages)) setHeroImages(data.heroImages)
       })
       .catch(() => {})
   }, [])
@@ -62,7 +72,7 @@ function AppShell() {
       />
 
       <main>
-        <Hero stats={stats} />
+        <Hero stats={stats} heroImages={heroImages} />
         <CategoryStrip onSelect={(id) => setPendingCategory(id)} />
         <ProductGrid initialCategory={pendingCategory} onCategoryConsumed={() => setPendingCategory(null)} />
         <PartnerSection />

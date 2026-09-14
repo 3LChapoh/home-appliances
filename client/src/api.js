@@ -84,4 +84,9 @@ export const ordersApi = {
 
 export const configApi = {
   get: () => request('/api/config'),
+  updateHeroImages: (files, token) => {
+    const fd = new FormData()
+    files.forEach((file) => fd.append('images', file))
+    return request('/api/config/hero-images', { method: 'PUT', body: fd, token, isForm: true })
+  },
 }

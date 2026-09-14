@@ -4,6 +4,7 @@ import AdminAuthGate from '../components/admin/AdminAuthGate'
 import AdminVendors from '../components/admin/AdminVendors'
 import AdminProducts from '../components/admin/AdminProducts'
 import AdminOrders from '../components/admin/AdminOrders'
+import AdminHero from '../components/admin/AdminHero'
 
 function Dashboard() {
   const { admin, logout } = useAdminAuth()
@@ -30,10 +31,14 @@ function Dashboard() {
         <button className={`tab${tab === 'orders' ? ' active' : ''}`} onClick={() => setTab('orders')}>
           Orders
         </button>
+        <button className={`tab${tab === 'hero' ? ' active' : ''}`} onClick={() => setTab('hero')}>
+          Hero Images
+        </button>
       </div>
       {tab === 'vendors' && <AdminVendors />}
       {tab === 'products' && <AdminProducts />}
       {tab === 'orders' && <AdminOrders />}
+      {tab === 'hero' && <AdminHero />}
     </section>
   )
 }

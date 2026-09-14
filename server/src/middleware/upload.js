@@ -2,14 +2,21 @@ const multer = require('multer')
 const { CloudinaryStorage } = require('multer-storage-cloudinary')
 const cloudinary = require('../config/cloudinary')
 
-// Files upload straight to Cloudinary, so nothing touches the server's local
-// disk — safe across Render redeploys (a local disk would get wiped).
-const storage = new CloudinaryStorage({
+const productStorage = new CloudinaryStorage({
   cloudinary,
   params: {
     folder: 'rubys-choice/products',
     allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
     transformation: [{ width: 1600, height: 2000, crop: 'limit' }],
+  },
+})
+
+const heroStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'rubys-choice/hero',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [{ width: 1200, height: 1600, crop: 'limit' }],
   },
 })
 
@@ -22,10 +29,10 @@ const fileFilter = (req, file, cb) => {
   }
 }
 
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB per image
-})
+const limits = { fileSize: 5 * 1024 * 1024 }
+
+const upload = multer({ storage: productStorage, fileFilter, limits })
+const uploadHero = multer({ storage: heroStorage, fileFilter, limits })
 
 module.exports = upload
+module.exports.uploadHero = uploadHero
