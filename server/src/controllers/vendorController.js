@@ -36,9 +36,19 @@ async function apply(req, res) {
       return res.status(400).json({ message: 'An application with that email already exists' })
     }
 
+    const nameTaken = await Vendor.findOne({
+      boutiqueName: new RegExp(`^${boutiqueName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+    })
+    if (nameTaken) {
+      return res.status(400).json({ message: 'That boutique name is already taken' })
+    }
+
     const vendor = await Vendor.create({ boutiqueName, contactName, email, phone, description })
     res.status(201).json(toPublic(vendor))
   } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({ message: 'That boutique name is already taken' })
+    }
     res.status(400).json({ message: 'Application failed', error: err.message })
   }
 }

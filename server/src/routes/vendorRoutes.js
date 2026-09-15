@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const { protect, requireRole, attachVendor } = require('../middleware/auth')
+const { authLimiter } = require('../middleware/rateLimit')
 const {
   apply,
   listVendors,
@@ -12,8 +13,8 @@ const {
 } = require('../controllers/vendorController')
 
 router.post('/apply', apply)
-router.post('/activate', activate)
-router.post('/login', login)
+router.post('/activate', authLimiter, activate)
+router.post('/login', authLimiter, login)
 
 router.get('/me', protect, requireRole('vendor'), attachVendor, getMe)
 

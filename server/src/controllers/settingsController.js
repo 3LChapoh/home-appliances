@@ -1,4 +1,5 @@
 const Settings = require('../models/Settings')
+const cloudinary = require('../config/cloudinary')
 
 async function getOrCreateSettings() {
   let settings = await Settings.findOne()
@@ -23,13 +24,25 @@ async function getConfig(req, res) {
 
 async function updateHeroImages(req, res) {
   try {
-    const urls = (req.files || []).map((f) => f.path)
-    if (urls.length === 0) {
+    const images = (req.files || []).map((f) => ({ url: f.path, publicId: f.filename }))
+    if (images.length === 0) {
       return res.status(400).json({ message: 'No images uploaded' })
     }
+
     const settings = await getOrCreateSettings()
-    settings.heroImages = urls
+    const oldImages = settings.heroImages
+
+    settings.heroImages = images
     await settings.save()
+
+    // Clean up the previous hero assets now that the new ones are saved.
+    oldImages.forEach(({ publicId }) => {
+      if (!publicId) return
+      cloudinary.uploader.destroy(publicId).catch((err) => {
+        console.error('Failed to delete old hero image:', publicId, err.message)
+      })
+    })
+
     res.json({ heroImages: settings.heroImages })
   } catch (err) {
     res.status(500).json({ message: 'Failed to update hero images', error: err.message })

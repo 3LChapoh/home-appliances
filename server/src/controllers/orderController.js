@@ -312,6 +312,10 @@ async function updateStatus(req, res) {
         })
       }
 
+      if (status === 'Cancelled' && vendorOrder.status !== 'Cancelled') {
+        await restockVendorOrder(vendorOrder)
+      }
+
       vendorOrder.status = status
 
       order.status = calculateOverallStatus(order.vendorOrders)
@@ -427,21 +431,25 @@ async function cancelMyOrder(req, res) {
 
 async function restockOrder(order, session = null) {
   for (const vendorOrder of order.vendorOrders) {
-    for (const item of vendorOrder.items) {
-      if (!mongoose.Types.ObjectId.isValid(item.product)) continue
+    await restockVendorOrder(vendorOrder, session)
+  }
+}
 
-      const query = Product.findByIdAndUpdate(
-        item.product,
-        { $inc: { stock: item.qty } },
-        { new: true }
-      )
+async function restockVendorOrder(vendorOrder, session = null) {
+  for (const item of vendorOrder.items) {
+    if (!mongoose.Types.ObjectId.isValid(item.product)) continue
 
-      if (session) {
-        query.session(session)
-      }
+    const query = Product.findByIdAndUpdate(
+      item.product,
+      { $inc: { stock: item.qty } },
+      { new: true }
+    )
 
-      await query
+    if (session) {
+      query.session(session)
     }
+
+    await query
   }
 }
 

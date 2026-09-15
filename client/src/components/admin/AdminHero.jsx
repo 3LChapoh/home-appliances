@@ -41,8 +41,8 @@ export default function AdminHero() {
       <h3 style={{ fontSize: 13, margin: '16px 0 8px' }}>Current hero images</h3>
       {current.length === 0 && <div className="notice">No hero images set — storefront hero will show no collage.</div>}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
-        {current.map((src) => (
-          <img key={src} src={src} alt="" style={{ width: 90, height: 120, objectFit: 'cover', borderRadius: 8 }} />
+        {current.map((img) => (
+          <img key={img.publicId} src={img.url} alt="" style={{ width: 90, height: 120, objectFit: 'cover', borderRadius: 8 }} />
         ))}
       </div>
 

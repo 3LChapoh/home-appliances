@@ -3,9 +3,13 @@ const bcrypt = require('bcryptjs')
 
 const vendorSchema = new mongoose.Schema(
   {
+    // boutiqueName is used to scope products/orders to a vendor everywhere
+    // in the app (string match, not _id), so it must be unique or two
+    // vendors with the same name would see/edit each other's data.
     boutiqueName: {
       type: String,
       required: [true, 'Boutique name is required'],
+      unique: true,
       trim: true,
     },
     contactName: {

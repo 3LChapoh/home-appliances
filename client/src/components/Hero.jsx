@@ -14,19 +14,22 @@ export default function Hero({ stats, heroImages = [] }) {
       <div className="hero-layer far" />
 
       <div className="hero-collage">
-        {images.slice(0, 5).map((image, i) => (
-          <div
-            className={`hero-slot ${['fx1', 'fx2', 'fx3'][i % 3]}`}
-            key={`${image}-${i}`}
-            style={{ animationDelay: `${-i * 3.4}s` }}
-          >
-            <img
-              src={image}
-              alt="Fine fragrance"
-              loading={i === 0 ? 'eager' : 'lazy'}
-            />
-          </div>
-        ))}
+        {images.slice(0, 5).map((image, i) => {
+          const src = typeof image === 'string' ? image : image.url
+          return (
+            <div
+              className={`hero-slot ${['fx1', 'fx2', 'fx3'][i % 3]}`}
+              key={`${src}-${i}`}
+              style={{ animationDelay: `${-i * 3.4}s` }}
+            >
+              <img
+                src={src}
+                alt="Fine fragrance"
+                loading={i === 0 ? 'eager' : 'lazy'}
+              />
+            </div>
+          )
+        })}
       </div>
 
       <div className="hero-layer near" />
