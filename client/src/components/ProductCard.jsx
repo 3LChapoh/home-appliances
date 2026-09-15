@@ -16,11 +16,13 @@ export default function ProductCard({ product, isFavourite, onToggleFavourite })
   const cat = categoryFor((product.category || '').toLowerCase().trim())
   const out = product.stock <= 0
   const img = imageUrl(product.images?.[0]?.url) || DEFAULT_IMG
+  const altImg = imageUrl(product.images?.[1]?.url)
 
   return (
     <article className="product" style={{ '--accent': cat.color }}>
       <div className="p-img">
         <img src={img} alt={product.name} loading="lazy" />
+        {altImg && <img className="alt" src={altImg} alt="" loading="lazy" />}
         <span className="badge">{cat.name}</span>
         <span className="stock">{stockLabel(product.stock)}</span>
         <button
