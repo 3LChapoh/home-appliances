@@ -45,7 +45,7 @@ export default function Footer() {
         </div>
       </div>
       <div className="wrap muted" style={{ fontSize: 11, paddingTop: 20 }}>
-        © {new Date().getFullYear()} Ruby's Choice, Nairobi. · <a href="#/admin">Admin</a>
+        © {new Date().getFullYear()}Boniface. ●. · <a href="#/admin">Admin</a>
       </div>
     </footer>
   )
