@@ -26,7 +26,7 @@ export default function Header({ theme, onToggleTheme, onOpenCart, onOpenAccount
           <a href="#collection">Collection</a>
           <a href="#categories">Categories</a>
           <a href="#partner">Partner</a>
-          <a href="#orders">Orders</a>
+          <button type="button" className="navlink-btn" onClick={onOpenAccount}>Orders</button>
         </nav>
         <div className="nav-actions">
           <button className="iconbtn" onClick={onToggleTheme} title="Toggle theme" aria-label="Toggle light or dark theme">

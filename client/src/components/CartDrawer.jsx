@@ -25,7 +25,7 @@ function orderSummaryText(order, items) {
 
 export default function CartDrawer({ onClose, onOrdersUpdated }) {
   const { items, changeQty, total, clear } = useCart()
-  const { token, user } = useAuth()
+  const { token, user, updateProfile } = useAuth()
   const showToast = useToast()
   const { whatsapp, email } = useContact()
   const [checkingOut, setCheckingOut] = useState(false)
@@ -70,6 +70,19 @@ export default function CartDrawer({ onClose, onOrdersUpdated }) {
       setPlacedOrder({ order, items: [...items] })
       clear()
       onOrdersUpdated?.()
+
+      if (token && user) {
+        const changed =
+          form.name.trim() !== (user.name || '') ||
+          form.phone.trim() !== (user.phone || '') ||
+          form.location.trim() !== (user.address || '')
+        if (changed) {
+          updateProfile({ name: form.name, phone: form.phone, address: form.location }).catch(() => {
+            // Order already succeeded — a failed profile sync just means next checkout
+            // won't be prefilled with these details, nothing to surface to the customer here.
+          })
+        }
+      }
     } catch (err) {
       showToast(err.message || 'Could not place order', true)
     } finally {
